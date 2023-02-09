@@ -79,6 +79,7 @@ parser.add_argument('--superres_ff_mult', type=int, default=4, help='Feedforward
 parser.add_argument('--superres_t5_name', type=str, default='t5-small', help='name of your T5')
 parser.add_argument('--superres_vq_codebook_size', type=int, default=256, help='')
 parser.add_argument('--superres_image_size', type=int, default=512, help='')
+parser.add_argument('--superres_timesteps', type=int, default=20, help='Time Steps to use for the generation.')
 
 # generate args
 parser.add_argument('--prompt', type=list, default=['a whale breaching from afar','young girl blowing out candles on her birthday cake', 'fireworks with blue and green sparkles',
@@ -152,8 +153,8 @@ def base_maskgit_trainer(base_texts=args.base_texts, base_resume_from=args.base_
         vq_codebook_size = base_vq_codebook_size
     ).cuda()
     
-    print ('Resuming VAE from: ', args.resume_from.replace('.pt' , '.base.pt'))
-    vae.load(args.resume_from.replace('.pt' , '.base.pt'))    # you will want to load the exponentially moving averaged VAE
+    print ('Resuming VAE from: ', args.resume_from)
+    vae.load(args.resume_from)    # you will want to load the exponentially moving averaged VAE
     
     # then you plug the vae and transformer into your MaskGit as so
     
@@ -237,7 +238,7 @@ def superres_maskgit_trainer(superres_texts=args.superres_texts, superres_resume
         vq_codebook_size = superres_vq_codebook_size
     ).cuda()
     
-    vae.load(args.resume_from.replace('.pt' , '.superres.pt')) # you will want to load the exponentially moving averaged VAE
+    vae.load(args.resume_from) # you will want to load the exponentially moving averaged VAE
     
     # then you plug the VqGan VAE into your MaskGit as so
     
@@ -287,7 +288,8 @@ def superres_maskgit_trainer(superres_texts=args.superres_texts, superres_resume
             'waking up to a psychedelic landscape'
         ],
         cond_images = F.interpolate(images, 256),  # conditioning images must be passed in for generating from superres
-        cond_scale = 3.
+        cond_scale = 3.,
+        timesteps=args.superres_timesteps,
     )
     
     # save the superres vae
@@ -349,6 +351,6 @@ def generate(prompt=args.prompt, base_model_path=args.base_model_path, superres_
 #
 if __name__ == '__main__':
     vae_trainer()
-    #base_maskgit_trainer()
-    #superres_maskgit_trainer()
+    base_maskgit_trainer()
+    superres_maskgit_trainer()
     #generate() 
