@@ -2,6 +2,7 @@ from math import sqrt
 from random import choice
 from pathlib import Path
 from shutil import rmtree
+from datetime import datetime
 
 from beartype import beartype
 
@@ -9,6 +10,7 @@ import torch
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.tensorboard import SummaryWriter
 
 import torchvision.transforms as T
 from torchvision.datasets import ImageFolder
@@ -116,7 +118,8 @@ class VQGanVAETrainer(nn.Module):
         discr_max_grad_norm = None,
         save_results_every = 100,
         save_model_every = 1000,
-        results_folder = './results',
+        results_dir = './results',
+        logging_dir = './results/logs',
         valid_frac = 0.05,
         random_split_seed = 42,
         use_ema = True,
@@ -137,6 +140,17 @@ class VQGanVAETrainer(nn.Module):
         accelerate_kwargs.update(kwargs_handlers = kwargs_handlers)
 
         self.accelerator = Accelerator(**accelerate_kwargs)
+
+        self.results_dir = Path(results_dir)
+        if len([*self.results_dir.glob('**/*')]) > 0 and yes_or_no('do you want to clear previous experiment checkpoints and results?'):
+            rmtree(str(self.results_dir))
+        self.results_dir.mkdir(parents = True, exist_ok = True)
+
+        self.logging_dir = Path(logging_dir)
+        self.logging_dir.mkdir(parents = True, exist_ok = True)
+
+        self.writer = SummaryWriter(log_dir=self.logging_dir)
+
 
         # vae
 
@@ -236,12 +250,7 @@ class VQGanVAETrainer(nn.Module):
 
         self.apply_grad_penalty_every = apply_grad_penalty_every
 
-        self.results_folder = Path(results_folder)
 
-        if len([*self.results_folder.glob('**/*')]) > 0 and yes_or_no('do you want to clear previous experiment checkpoints and results?'):
-            rmtree(str(self.results_folder))
-
-        self.results_folder.mkdir(parents = True, exist_ok = True)
 
     def save(self, path):
         if not self.accelerator.is_local_main_process:
@@ -348,6 +357,10 @@ class VQGanVAETrainer(nn.Module):
 
             self.print(f"{steps}: vae loss: {logs['loss']} - discr loss: {logs['discr_loss']} - lr: {self.lr_scheduler_optim.get_last_lr()[0]}")
 
+        self.writer.add_scalar('Train/vae_loss', logs['loss'], steps)
+        self.writer.add_scalar('Train/discr_loss', logs['discr_loss'], steps)
+        self.writer.add_scalar('LR', self.lr_scheduler_optim.get_last_lr()[0], steps)
+
         # update exponential moving averaged generator
 
         if self.use_ema:
@@ -379,23 +392,23 @@ class VQGanVAETrainer(nn.Module):
 
                 logs['reconstructions'] = grid
 
-                save_image(grid, str(self.results_folder / f'{filename}.png'))
+                save_image(grid, str(self.results_dir / f'{filename}.png'))
 
-            self.print(f'{steps}: saving to {str(self.results_folder)}')
+            self.print(f'{steps}: saving to {str(self.results_dir)}')
 
         # save model every so often
         self.accelerator.wait_for_everyone()
         if self.is_main and not (steps % self.save_model_every):
             state_dict = self.accelerator.unwrap_model(self.vae).state_dict()
-            model_path = str(self.results_folder / f'vae.{steps}.pt')
+            model_path = str(self.results_dir / f'vae.{steps}.pt')
             self.accelerator.save(state_dict, model_path)
 
             if self.use_ema:
                 ema_state_dict = self.accelerator.unwrap_model(self.ema_vae).state_dict()
-                model_path = str(self.results_folder / f'vae.{steps}.ema.pt')
+                model_path = str(self.results_dir / f'vae.{steps}.ema.pt')
                 self.accelerator.save(ema_state_dict, model_path)
 
-            self.print(f'{steps}: saving model to {str(self.results_folder)}')
+            self.print(f'{steps}: saving model to {str(self.results_dir)}')
 
         self.steps += 1
         return logs
@@ -406,5 +419,5 @@ class VQGanVAETrainer(nn.Module):
         while self.steps < self.num_train_steps:
             logs = self.train_step()
             log_fn(logs)
-
+        self.writer.close()
         self.print('training complete')

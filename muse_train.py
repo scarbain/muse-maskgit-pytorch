@@ -21,18 +21,18 @@ torch.backends.cudnn.enabled = True
 # Create the parser
 parser = argparse.ArgumentParser()
 
-results_folder = 'results'
-logging_dir = os.path.join(results_folder, 'logging')
+# def latest_file(path = results_dir, pattern: str = "*.pt"):
+#     import glob
+#     files_path = os.path.join(path, pattern)
+#     files = sorted(
+#     glob.iglob(files_path), key=os.path.getctime, reverse=True) 
+    
+#     #print (files[0])
+    
+#     return files[0]
 
-def latest_file(path = results_folder, pattern: str = "*.pt"):
-    import glob
-    files_path = os.path.join(path, pattern)
-    files = sorted(
-    glob.iglob(files_path), key=os.path.getctime, reverse=True) 
-    
-    #print (files[0])
-    
-    return files[0]
+parser.add_argument('--results_dir', type=str, default='results', help="Path to save the training samples and checkpoints")
+parser.add_argument('--logging_dir', type=str, default='results/logs', help="Path to log the losses and LR")
 
 # vae_trainer args
 parser.add_argument('--resume_from', type=str, default='', help="Path to the vae model. eg. 'results/vae.steps.pt'")
@@ -93,6 +93,8 @@ parser.add_argument('--generate_cond_scale', type=int, default=3, help='Conditio
 
 # Parse the argument
 args = parser.parse_args()
+results_dir=args.results_dir
+logging_dir=args.logging_dir
 
 def vae_trainer(resume_from=args.resume_from, dim=args.dim, vq_codebook_size=args.vq_codebook_size,
                          data_folder=args.data_folder, num_train_steps=args.num_train_steps,
@@ -108,9 +110,9 @@ def vae_trainer(resume_from=args.resume_from, dim=args.dim, vq_codebook_size=arg
     
     # load the vae from disk if we have previously trained one
     if resume_from:
-        #print ('Resuming VAE from: ', os.path.join(results_folder, resume_from + '.pt'))
+        #print ('Resuming VAE from: ', os.path.join(results_dir, resume_from + '.pt'))
         print ('Resuming VAE from: ', resume_from)
-        #vae.load(os.path.join(results_folder, resume_from + '.pt'))
+        #vae.load(os.path.join(results_dir, resume_from + '.pt'))
         vae.load(resume_from)
     
     #with torch.autocast('cuda'):
@@ -129,7 +131,8 @@ def vae_trainer(resume_from=args.resume_from, dim=args.dim, vq_codebook_size=arg
         discr_max_grad_norm = None,
         save_results_every = save_results_every,
         save_model_every = save_model_every,
-        results_folder = results_folder,
+        results_dir = results_dir,
+        logging_dir = logging_dir,
         valid_frac = 0.05,
         random_split_seed = 42,
         use_ema = True,
@@ -219,12 +222,12 @@ def base_maskgit_trainer(base_texts=args.base_texts, base_resume_from=args.base_
     
     img1 = images[0]
     
-    save_image(img1, f'{results_folder}/outputs/base_result.png')
-    #img.save(f'{results_folder}/outputs/base_result.png')
+    save_image(img1, f'{results_dir}/outputs/base_result.png')
+    #img.save(f'{results_dir}/outputs/base_result.png')
     
     #for count in len(images):
     #    for image in images:
-    #image.save(f'{results_folder}/outputs/base_{count}.png')    
+    #image.save(f'{results_dir}/outputs/base_{count}.png')    
 
 
 #
@@ -305,11 +308,11 @@ def superres_maskgit_trainer(superres_texts=args.superres_texts, superres_resume
     
     img1 = images[0]
     
-    save_image(img1, f'{results_folder}/outputs/superres_result.png')    
+    save_image(img1, f'{results_dir}/outputs/superres_result.png')    
     
     #for count in len(images):
         #for image in images:
-            #image.save(f'{results_folder}/outputs/superres_{count}.png')    
+            #image.save(f'{results_dir}/outputs/superres_{count}.png')    
     
 
 def generate(prompt=args.prompt, base_model_path=args.base_model_path, superres_maskgit=args.superres_maskgit,
@@ -347,11 +350,11 @@ def generate(prompt=args.prompt, base_model_path=args.base_model_path, superres_
     
     img1 = images[0]
     
-    save_image(img1, f'{results_folder}/outputs/result.png')        
+    save_image(img1, f'{results_dir}/outputs/result.png')        
     
     #for count in len(images):
         #for image in images:
-            #image.save(f'{results_folder}/outputs/result_{count}.png')
+            #image.save(f'{results_dir}/outputs/result_{count}.png')
 
 #
 if __name__ == '__main__':
