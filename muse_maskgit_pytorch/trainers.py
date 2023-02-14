@@ -22,6 +22,8 @@ from accelerate import Accelerator, DistributedType, DistributedDataParallelKwar
 
 from ema_pytorch import EMA
 
+from muse_maskgit_pytorch.diffusers_optimization import get_scheduler
+
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -107,6 +109,8 @@ class VQGanVAETrainer(nn.Module):
         batch_size,
         image_size,
         lr = 3e-4,
+        lr_scheduler='constant',
+        lr_warmup_steps= 500,
         grad_accum_every = 1,
         max_grad_norm = None,
         discr_max_grad_norm = None,
@@ -157,6 +161,19 @@ class VQGanVAETrainer(nn.Module):
         self.optim = Adam(vae_parameters, lr = lr)
         self.discr_optim = Adam(discr_parameters, lr = lr)
 
+        self.lr_scheduler_optim = get_scheduler(
+            lr_scheduler,
+            optimizer=self.optim,
+            num_warmup_steps=lr_warmup_steps * self.grad_accum_every,
+            num_training_steps=self.num_train_steps * self.grad_accum_every,
+        )
+
+        self.lr_scheduler_discr_optim = get_scheduler(
+            lr_scheduler,
+            optimizer=self.discr_optim,
+            num_warmup_steps=lr_warmup_steps * self.grad_accum_every,
+            num_training_steps=self.num_train_steps * self.grad_accum_every,
+        )
         self.max_grad_norm = max_grad_norm
         self.discr_max_grad_norm = discr_max_grad_norm
 
@@ -302,6 +319,8 @@ class VQGanVAETrainer(nn.Module):
         if exists(self.max_grad_norm):
             self.accelerator.clip_grad_norm_(self.vae.parameters(), self.max_grad_norm)
 
+        self.lr_scheduler_optim.step()
+        self.lr_scheduler_discr_optim.step()
         self.optim.step()
         self.optim.zero_grad()
 
@@ -327,7 +346,7 @@ class VQGanVAETrainer(nn.Module):
 
             # log
 
-            self.print(f"{steps}: vae loss: {logs['loss']} - discr loss: {logs['discr_loss']}")
+            self.print(f"{steps}: vae loss: {logs['loss']} - discr loss: {logs['discr_loss']} - lr: {self.lr_scheduler_optim.get_last_lr()[0]}")
 
         # update exponential moving averaged generator
 

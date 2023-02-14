@@ -46,6 +46,8 @@ parser.add_argument('--save_results_every', type=int, default=100, help='Save re
 parser.add_argument('--save_model_every', type=int, default=500, help='Save the model every this number of steps.')
 parser.add_argument('--vq_codebook_size', type=int, default=256, help='Image Size.')
 parser.add_argument('--image_size', type=int, default=256, help='Image size. You may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it')
+parser.add_argument("--lr_scheduler", type=str, default="constant", help='The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"]')
+parser.add_argument("--lr_warmup_steps", type=int, default=0, help='Number of steps for the warmup in the lr scheduler.')
 
 # base args
 parser.add_argument('--base_texts', type=list, default=['a whale breaching from afar','young girl blowing out candles on her birthday cake', 'fireworks with blue and green sparkles',
@@ -95,7 +97,8 @@ args = parser.parse_args()
 def vae_trainer(resume_from=args.resume_from, dim=args.dim, vq_codebook_size=args.vq_codebook_size,
                          data_folder=args.data_folder, num_train_steps=args.num_train_steps,
                          batch_size=args.batch_size, image_size=args.image_size,
-                         lr=args.lr, grad_accum_every=args.grad_accum_every, save_results_every=args.save_results_every,
+                         lr=args.lr, lr_scheduler=args.lr_scheduler, lr_warmup_steps=args.lr_warmup_steps,
+                         grad_accum_every=args.grad_accum_every, save_results_every=args.save_results_every,
                          save_model_every=args.save_model_every,
                          ):
     vae = VQGanVAE(
@@ -119,6 +122,8 @@ def vae_trainer(resume_from=args.resume_from, dim=args.dim, vq_codebook_size=arg
         batch_size = batch_size,
         image_size = image_size,    # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
         lr = lr,
+        lr_scheduler = lr_scheduler,
+        lr_warmup_steps = lr_warmup_steps,
         grad_accum_every = grad_accum_every,
         max_grad_norm = None,
         discr_max_grad_norm = None,
