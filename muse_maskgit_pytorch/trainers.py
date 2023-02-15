@@ -107,6 +107,7 @@ class VQGanVAETrainer(nn.Module):
         vae: VQGanVAE,
         *,
         folder,
+        current_step,
         num_train_steps,
         batch_size,
         image_size,
@@ -158,8 +159,7 @@ class VQGanVAETrainer(nn.Module):
 
         # training params
 
-        self.register_buffer('steps', torch.Tensor([0]))
-
+        self.register_buffer('steps', torch.Tensor([current_step]))
         self.num_train_steps = num_train_steps
         self.batch_size = batch_size
         self.grad_accum_every = grad_accum_every

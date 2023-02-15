@@ -107,19 +107,30 @@ def vae_trainer(resume_from=args.resume_from, dim=args.dim, vq_codebook_size=arg
         dim = dim,
         vq_codebook_size = vq_codebook_size
     )
-    
+
+    current_step = 0
     # load the vae from disk if we have previously trained one
     if resume_from:
         #print ('Resuming VAE from: ', os.path.join(results_dir, resume_from + '.pt'))
         print ('Resuming VAE from: ', resume_from)
         #vae.load(os.path.join(results_dir, resume_from + '.pt'))
         vae.load(resume_from)
+
+        resume_from_parts = resume_from.split('.')
+        for i in range(len(resume_from_parts)-1, -1, -1):
+            if resume_from_parts[i].isdigit():
+                current_step = int(resume_from_parts[i])
+                print("Found step "+str(current_step))
+                break
+        if current_step == 0:
+            print("No step found")
     
     #with torch.autocast('cuda'):
     # train on folder of images, as many images as possible
     trainer = VQGanVAETrainer(
         vae,
         folder = data_folder,
+        current_step = current_step,
         num_train_steps = num_train_steps,
         batch_size = batch_size,
         image_size = image_size,    # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
